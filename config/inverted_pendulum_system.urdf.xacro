@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<!-- Basic differential drive mobile base -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="takagon">
+  <!-- Enable setting arguments from the launch file -->
+  <xacro:arg name="prefix" default=""/>
+
+  <xacro:include filename="$(find inverted_pendulum_control)/config/inverted_pendulum.urdf.xacro"/>
+
+  <xacro:include filename="$(find inverted_pendulum_control)/config/inverted_pendulum.materials.xacro" />
+
+  <xacro:include filename="$(find inverted_pendulum_control)/config/inverted_pendulum_system.ros2_control.xacro"/>
+
+  <xacro:inverted_pendulum prefix="$(arg prefix)"/>
+
+  <xacro:inverted_pendulum_system name="InvertedPendulumSystem"/>
+
+</robot>
