@@ -1,19 +1,13 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
-from launch.substitutions import Command, FindExecutable, LaunchConfiguration, PathJoinSubstitution
+from launch.actions import RegisterEventHandler
+from launch.event_handlers import OnProcessExit
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
+
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-
-    arg_show_rviz = DeclareLaunchArgument(
-        "start_rviz",
-        default_value="false",
-        description="start RViz automatically with the launch file",
-    )
-
     # Get URDF via xacro
     robot_description_content = Command(
         [
@@ -26,62 +20,78 @@ def generate_launch_description():
     )
     robot_description = {"robot_description": robot_description_content}
 
-    diffbot_diff_drive_controller = PathJoinSubstitution(
+    robot_controllers = PathJoinSubstitution(
         [
             FindPackageShare("inverted_pendulum_control"),
             "config",
-            "inverted_pendulum_diff_drive_controller.yaml",
+            "inverted_pendulum_diff_drive_controllers.yaml",
         ]
     )
-
-    node_robot_state_publisher = Node(
-        package="robot_state_publisher",
-        executable="robot_state_publisher",
-        output="screen",
-        parameters=[robot_description],
+    rviz_config_file = PathJoinSubstitution(
+        [FindPackageShare("inverted_pendulum_control"), "config", "inverted_pendulum.rviz"]
     )
 
-    controller_manager_node = Node(
+    control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_description, diffbot_diff_drive_controller],
+        parameters=[robot_description, robot_controllers],
         output={
             "stdout": "screen",
             "stderr": "screen",
         },
     )
-
-    spawn_dd_controller = Node(
-        package="controller_manager",
-        executable="spawner.py",
-        arguments=["inverted_pendulum_controller"],
-        output="screen",
-    )
-    spawn_jsb_controller = Node(
-        package="controller_manager",
-        executable="spawner.py",
-        arguments=["joint_state_broadcaster"],
-        output="screen",
-    )
-
-    rviz_config_file = PathJoinSubstitution(
-        [FindPackageShare("inverted_pendulum_control"), "config", "inverted_pendulum.rviz"]
+    robot_state_pub_node = Node(
+        package="robot_state_publisher",
+        executable="robot_state_publisher",
+        output="both",
+        parameters=[robot_description],
+        remappings=[
+            ("/diff_drive_controller/cmd_vel_unstamped", "/cmd_vel"),
+        ],
     )
     rviz_node = Node(
         package="rviz2",
         executable="rviz2",
         name="rviz2",
+        output="log",
         arguments=["-d", rviz_config_file],
-        condition=IfCondition(LaunchConfiguration("start_rviz")),
     )
 
-    return LaunchDescription(
-        [
-            arg_show_rviz,
-            node_robot_state_publisher,
-            controller_manager_node,
-            spawn_dd_controller,
-            spawn_jsb_controller,
-            rviz_node,
-        ]
+    joint_state_broadcaster_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster", "--controller-manager", "/controller_manager"],
     )
+
+    robot_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["inverted_pendulum_controller", "-c", "/controller_manager"],
+    )
+
+    # Delay rviz start after `joint_state_broadcaster`
+    delay_rviz_after_joint_state_broadcaster_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[rviz_node],
+        )
+    )
+
+    # Delay start of robot_controller after `joint_state_broadcaster`
+    delay_robot_controller_spawner_after_joint_state_broadcaster_spawner = RegisterEventHandler(
+        event_handler=OnProcessExit(
+            target_action=joint_state_broadcaster_spawner,
+            on_exit=[robot_controller_spawner],
+        )
+    )
+
+    nodes = [
+        control_node,
+        robot_state_pub_node,
+        rviz_node,
+        joint_state_broadcaster_spawner,
+        delay_rviz_after_joint_state_broadcaster_spawner,
+        delay_robot_controller_spawner_after_joint_state_broadcaster_spawner,
+    ]
+
+    return LaunchDescription(nodes)
