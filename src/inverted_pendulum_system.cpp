@@ -11,20 +11,21 @@
 
 namespace inverted_pendulum_control
 {
-hardware_interface::return_type InvertedPendulumSystemHardware::configure(
-  const hardware_interface::HardwareInfo & info)
+CallbackReturn InvertedPendulumSystemHardware::on_init(const hardware_interface::HardwareInfo & info)
 {
   base_x_ = 0.0;
   base_y_ = 0.0;
   base_theta_ = 0.0;
 
-  if (configure_default(info) != hardware_interface::return_type::OK)
+  if (hardware_interface::SystemInterface::on_init(info) != CallbackReturn::SUCCESS)
   {
-    return hardware_interface::return_type::ERROR;
+    return CallbackReturn::ERROR;
   }
 
+  // START: This part here is for exemplary purposes - Please do not copy to your production code
   hw_start_sec_ = stod(info_.hardware_parameters["example_param_hw_start_duration_sec"]);
   hw_stop_sec_ = stod(info_.hardware_parameters["example_param_hw_stop_duration_sec"]);
+  // END: This part here is for exemplary purposes - Please do not copy to your production code
   hw_positions_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_velocities_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
   hw_commands_.resize(info_.joints.size(), std::numeric_limits<double>::quiet_NaN());
@@ -36,9 +37,9 @@ hardware_interface::return_type InvertedPendulumSystemHardware::configure(
     {
       RCLCPP_FATAL(
         rclcpp::get_logger("InvertedPendulumSystemHardware"),
-        "Joint '%s' has %d command interfaces found. 1 expected.", joint.name.c_str(),
+        "Joint '%s' has %zu command interfaces found. 1 expected.", joint.name.c_str(),
         joint.command_interfaces.size());
-      return hardware_interface::return_type::ERROR;
+      return CallbackReturn::ERROR;
     }
 
     if (joint.command_interfaces[0].name != hardware_interface::HW_IF_VELOCITY)
@@ -47,26 +48,25 @@ hardware_interface::return_type InvertedPendulumSystemHardware::configure(
         rclcpp::get_logger("InvertedPendulumSystemHardware"),
         "Joint '%s' have %s command interfaces found. '%s' expected.", joint.name.c_str(),
         joint.command_interfaces[0].name.c_str(), hardware_interface::HW_IF_VELOCITY);
-      return hardware_interface::return_type::ERROR;
+      return CallbackReturn::ERROR;
     }
 
     if (joint.state_interfaces.size() != 2)
     {
       RCLCPP_FATAL(
         rclcpp::get_logger("InvertedPendulumSystemHardware"),
-        "Joint '%s' has %d state interface. 2 expected.", joint.name.c_str(),
+        "Joint '%s' has %zu state interface. 2 expected.", joint.name.c_str(),
         joint.state_interfaces.size());
-      return hardware_interface::return_type::ERROR;
+      return CallbackReturn::ERROR;
     }
 
     if (joint.state_interfaces[0].name != hardware_interface::HW_IF_POSITION)
     {
       RCLCPP_FATAL(
         rclcpp::get_logger("InvertedPendulumSystemHardware"),
-        "Joint '%s' have '%s' as first state interface. '%s' and '%s' expected.",
-        joint.name.c_str(), joint.state_interfaces[0].name.c_str(),
-        hardware_interface::HW_IF_POSITION);
-      return hardware_interface::return_type::ERROR;
+        "Joint '%s' have '%s' as first state interface. '%s' expected.", joint.name.c_str(),
+        joint.state_interfaces[0].name.c_str(), hardware_interface::HW_IF_POSITION);
+      return CallbackReturn::ERROR;
     }
 
     if (joint.state_interfaces[1].name != hardware_interface::HW_IF_VELOCITY)
@@ -75,12 +75,11 @@ hardware_interface::return_type InvertedPendulumSystemHardware::configure(
         rclcpp::get_logger("InvertedPendulumSystemHardware"),
         "Joint '%s' have '%s' as second state interface. '%s' expected.", joint.name.c_str(),
         joint.state_interfaces[1].name.c_str(), hardware_interface::HW_IF_VELOCITY);
-      return hardware_interface::return_type::ERROR;
+      return CallbackReturn::ERROR;
     }
   }
 
-  status_ = hardware_interface::status::CONFIGURED;
-  return hardware_interface::return_type::OK;
+  return CallbackReturn::SUCCESS;
 }
 
 std::vector<hardware_interface::StateInterface> InvertedPendulumSystemHardware::export_state_interfaces()
@@ -109,16 +108,19 @@ std::vector<hardware_interface::CommandInterface> InvertedPendulumSystemHardware
   return command_interfaces;
 }
 
-hardware_interface::return_type InvertedPendulumSystemHardware::start()
+CallbackReturn InvertedPendulumSystemHardware::on_activate(
+  const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Starting ...please wait...");
+  // START: This part here is for exemplary purposes - Please do not copy to your production code
+  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Activating ...please wait...");
 
-  for (auto i = 0; i <= hw_start_sec_; i++)
+  for (auto i = 0; i < hw_start_sec_; i++)
   {
     rclcpp::sleep_for(std::chrono::seconds(1));
     RCLCPP_INFO(
       rclcpp::get_logger("InvertedPendulumSystemHardware"), "%.1f seconds left...", hw_start_sec_ - i);
   }
+  // END: This part here is for exemplary purposes - Please do not copy to your production code
 
   // set some default values
   for (auto i = 0u; i < hw_positions_.size(); i++)
@@ -131,29 +133,28 @@ hardware_interface::return_type InvertedPendulumSystemHardware::start()
     }
   }
 
-  status_ = hardware_interface::status::STARTED;
+  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Successfully activated!");
 
-  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "System Successfully started!");
-
-  return hardware_interface::return_type::OK;
+  return CallbackReturn::SUCCESS;
 }
 
-hardware_interface::return_type InvertedPendulumSystemHardware::stop()
+CallbackReturn InvertedPendulumSystemHardware::on_deactivate(
+  const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Stopping ...please wait...");
+  // START: This part here is for exemplary purposes - Please do not copy to your production code
+  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Deactivating ...please wait...");
 
-  for (auto i = 0; i <= hw_stop_sec_; i++)
+  for (auto i = 0; i < hw_stop_sec_; i++)
   {
     rclcpp::sleep_for(std::chrono::seconds(1));
     RCLCPP_INFO(
       rclcpp::get_logger("InvertedPendulumSystemHardware"), "%.1f seconds left...", hw_stop_sec_ - i);
   }
+  // END: This part here is for exemplary purposes - Please do not copy to your production code
 
-  status_ = hardware_interface::status::STOPPED;
+  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Successfully deactivated!");
 
-  RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "System successfully stopped!");
-
-  return hardware_interface::return_type::OK;
+  return CallbackReturn::SUCCESS;
 }
 
 hardware_interface::return_type InvertedPendulumSystemHardware::read()
@@ -171,10 +172,12 @@ hardware_interface::return_type InvertedPendulumSystemHardware::read()
     hw_positions_[i] = hw_positions_[1] + dt * hw_commands_[i];
     hw_velocities_[i] = hw_commands_[i];
 
+    // START: This part here is for exemplary purposes - Please do not copy to your production code
     RCLCPP_INFO(
       rclcpp::get_logger("InvertedPendulumSystemHardware"),
       "Got position state %.5f and velocity state %.5f for '%s'!", hw_positions_[i],
       hw_velocities_[i], info_.joints[i].name.c_str());
+    // END: This part here is for exemplary purposes - Please do not copy to your production code
   }
 
   // Update the free-flyer, i.e. the base notation using the classical
@@ -186,15 +189,18 @@ hardware_interface::return_type InvertedPendulumSystemHardware::read()
   base_y_ += base_dy * dt;
   base_theta_ += base_dtheta * dt;
 
+  // START: This part here is for exemplary purposes - Please do not copy to your production code
   RCLCPP_INFO(
     rclcpp::get_logger("InvertedPendulumSystemHardware"), "Joints successfully read! (%.5f,%.5f,%.5f)",
     base_x_, base_y_, base_theta_);
+  // END: This part here is for exemplary purposes - Please do not copy to your production code
 
   return hardware_interface::return_type::OK;
 }
 
 hardware_interface::return_type inverted_pendulum_control::InvertedPendulumSystemHardware::write()
 {
+  // START: This part here is for exemplary purposes - Please do not copy to your production code
   RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Writing...");
 
   for (auto i = 0u; i < hw_commands_.size(); i++)
@@ -205,6 +211,7 @@ hardware_interface::return_type inverted_pendulum_control::InvertedPendulumSyste
       info_.joints[i].name.c_str());
   }
   RCLCPP_INFO(rclcpp::get_logger("InvertedPendulumSystemHardware"), "Joints successfully written!");
+  // END: This part here is for exemplary purposes - Please do not copy to your production code
 
   return hardware_interface::return_type::OK;
 }
